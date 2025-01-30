@@ -15,34 +15,37 @@ import asyncpg
 import datetime
 
 
-async def fetch_task(pool, worker_id):
-    # находим задачу, ставим статус processing и назначаем воркеру
-    await pool.fetch('''
-        WITH Next_tasks AS (
-        SELECT *
+async def fetch_task(pool):
+    # находим задачу, возвращаем её id
+    task_id = await pool.fetchval('''
+        SELECT id
         FROM Tasks
         WHERE STATUS = 'pending'
         LIMIT 1
-        FOR UPDATE SKIP LOCKED
-        )
-        UPDATE Tasks
-        SET status = 'processing',
-            worker_id = $1
-        FROM Next_tasks
-        WHERE Tasks.id = Next_tasks.id
-    ''', worker_id)
+        FOR UPDATE SKIP LOCKED;
+        ''')
+    return task_id
 
 
 async def worker(pool, worker_id):
-    # имитируем выполнение задачи, после присваиваем задаче статус completed и время выполнения
-    await fetch_task(pool, worker_id)   # здесь блокируем задачу для других воркеров и назначаем текущему
-    await asyncio.sleep(0.5)
+
+    task_id = await fetch_task(pool)   # принимаем id задача, начинаем выполнять
+
+    await pool.fetch('''
+        UPDATE Tasks
+        SET status = 'processing',
+        worker_id = $1
+        WHERE Tasks.id = $2
+    ''', worker_id, task_id)
+
+    # Здесь какая-то бизнес-логика
+
     await pool.fetch('''
     UPDATE Tasks
     SET status = 'completed',
         updated_at = $1
-    WHERE worker_id = $2
-    ''', datetime.datetime.now(), worker_id)
+    WHERE Tasks.id = $2
+    ''', datetime.datetime.now(), task_id)
 
 
 async def main():

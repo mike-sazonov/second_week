@@ -1,15 +1,21 @@
+# Задача - Распределенный лок
+#
+# У вас есть распределенное приложение работающее на десятках серверах.
+# Вам необходимо написать декоратор single который гарантирует,
+# что декорируемая функция не исполняется параллельно.
+
+
 import redis
 import secrets
 
 from datetime import timedelta
-
-r = redis.Redis()
 
 
 class ResourceLocked(Exception):
     pass
 
 
+r = redis.Redis()
 
 
 def single(max_processing_time: timedelta):
